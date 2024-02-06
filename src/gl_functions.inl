@@ -90,6 +90,7 @@
     X(void,     glDeleteTextures,         GLsizei n, const GLuint *textures)\
     X(void,     glDeleteShader,           GLuint shader)                                          \
     X(void, glPolygonMode,  GLenum face, GLenum mode) \
+    X(void, glObjectLabel, GLenum identifier​, GLuint name​, GLsizei length​, const char * label) \
 
 #define GL_FUNCTIONS \
     GL_FUNCTIONS_GRAPHICS_DEBUG \

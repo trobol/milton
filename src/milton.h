@@ -237,6 +237,11 @@ struct Milton
     i32 grid_rows;
     i32 grid_columns;
 
+    f32 merge_dist;
+    f32 merge_angle;
+
+    bool debug_render;
+
 #if MILTON_ENABLE_PROFILING
     b32 viz_window_visible;
     GraphData graph_frame;

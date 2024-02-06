@@ -93,6 +93,7 @@ struct RenderBackend
 #if MILTON_DEBUG
     GLuint simple_program;
 #endif
+    GLuint stroke_debug_program;
 
     // VBO for the screen-covering quad.
     GLuint vbo_screen_quad;
@@ -561,6 +562,16 @@ gpu_init(RenderBackend* r, CanvasView* view, ColorPicker* picker)
         r->stroke_clear_program = glCreateProgram();
         gl::link_program(r->stroke_clear_program, objs, array_count(objs));
     }
+    {  // Stroke raster program
+        GLuint objs[2];
+
+        objs[0] = stroke_vs;
+        objs[1] = gl::compile_shader(g_stroke_debug_f, GL_FRAGMENT_SHADER);
+
+        r->stroke_debug_program = glCreateProgram();
+
+        gl::link_program(r->stroke_debug_program, objs, array_count(objs));
+    }
     {  // Color picker program
         r->picker_program = glCreateProgram();
         GLuint objs[2] = {};
@@ -698,6 +709,7 @@ gpu_update_scale(RenderBackend* r, i32 scale)
     r->scale = scale;
     GLuint ps[] = {
         r->stroke_program,
+        r->stroke_debug_program,
         r->stroke_eraser_program,
         r->stroke_info_program,
         r->stroke_fill_program_pressure,
@@ -831,6 +843,7 @@ set_screen_size(RenderBackend* r, float* fscreen)
 {
     GLuint programs[] = {
         r->stroke_program,
+        r->stroke_debug_program,
         r->stroke_eraser_program,
         r->stroke_info_program,
         r->stroke_fill_program_pressure,
@@ -872,6 +885,7 @@ gpu_update_canvas(RenderBackend* r, CanvasState* canvas, CanvasView* view)
 
     GLuint ps[] = {
         r->stroke_program,
+        r->stroke_debug_program,
         r->stroke_eraser_program,
         r->stroke_info_program,
         r->stroke_fill_program_pressure,
@@ -951,6 +965,9 @@ gpu_cook_stroke(Arena* arena, RenderBackend* r, Stroke* stroke, CookStrokeOpt co
             const size_t count_indices = 6*((size_t)npoints-1);
 
             size_t count_debug = 0;
+			#if STROKE_DEBUG_VIZ
+			count_debug = count_attribs;
+			#endif
             v3f* bounds;
             v3f* apoints;
             v3f* bpoints;
@@ -1049,7 +1066,7 @@ gpu_cook_stroke(Arena* arena, RenderBackend* r, Stroke* stroke, CookStrokeOpt co
                 for ( int repeat = 0; repeat < 4; ++repeat ) {
                     apoints[apoints_i++] = { (float)point_i.x, (float)point_i.y, pressure_a };
                     bpoints[bpoints_i++] = { (float)point_j.x, (float)point_j.y, pressure_b };
-                    #if STROKE_DEBUG_VIZ
+                   	#if STROKE_DEBUG_VIZ 
                         v3f debug_color;
 
                         if ( stroke->debug_flags[i] & Stroke::INTERPOLATED ) {
@@ -1059,6 +1076,7 @@ gpu_cook_stroke(Arena* arena, RenderBackend* r, Stroke* stroke, CookStrokeOpt co
                             debug_color = { 0.0f, 1.0f, 0.0f };
                         }
                         debug[debug_i++] = debug_color;
+                        mlt_assert(debug_i <= count_debug);
                     #endif
                 }
             }
@@ -1535,8 +1553,6 @@ gpu_render_canvas(RenderBackend* r, i32 view_x, i32 view_y,
         }
         // If this render element is not a layer, then it is a stroke.
         else {
-            GLuint program_for_stroke = r->stroke_program;
-
             auto stroke_pass = [r, texture_target](RenderElement* re, GLuint program_for_stroke) {
                 i64 count = re->count;
                 gl::use_program(program_for_stroke);
@@ -1551,6 +1567,7 @@ gpu_render_canvas(RenderBackend* r, i32 view_x, i32 view_y,
                 gl::vertex_attrib_v3f(program_for_stroke, "a_pointa", re->vbo_pointa);
                 gl::vertex_attrib_v3f(program_for_stroke, "a_pointb", re->vbo_pointb);
                 gl::vertex_attrib_v3f(program_for_stroke, "a_position", re->vbo_stroke);
+                gl::vertex_attrib_v3f(program_for_stroke, "a_debug_color", re->vbo_debug);
 
                 glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, re->indices);
 
@@ -1605,7 +1622,10 @@ gpu_render_canvas(RenderBackend* r, i32 view_x, i32 view_y,
                 }
                 else {
                     // Fast path
-                    stroke_pass(re, r->stroke_program);
+                     GLuint program_for_stroke = (r->flags & RenderBackendFlags_DEBUG) ? 
+                                        r->stroke_debug_program :
+                                        r->stroke_program ;
+                    stroke_pass(re, program_for_stroke);
                 }
             } else {
                 static int n = 0;
@@ -1714,6 +1734,7 @@ gpu_render(RenderBackend* r,  i32 view_x, i32 view_y, i32 view_width, i32 view_h
     PUSH_GRAPHICS_GROUP("outlines");
     // Brush outline
     {
+        glEnable(GL_BLEND);
         gl::use_program(r->outline_program);
         GLint loc = glGetAttribLocation(r->outline_program, "a_position");
         if ( loc >= 0 ) {

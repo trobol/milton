@@ -177,6 +177,7 @@ output_shader(FILE* of, const char* fname, const char* fname_prelude = NULL)
     }
 
     fprintf(of, "static char %s[] = \n", varname);
+	fprintf(of, "\"//%s\\n\"\n", fname);
     for ( i64 i = 0; i < prelude_lines_count; ++i ) {
         size_t len = strlen(prelude_lines[i]);
         prelude_lines[i][len-1]='\0';  // Strip newline

@@ -320,6 +320,9 @@ gui_brush_window(MiltonInput* input, PlatformState* platform, Milton* milton, Pl
     // Brush Window
     if ( show_brush_window ) {
         if ( ImGui::Begin(loc(TXT_brushes), NULL, imgui_window_flags) ) {
+
+            ImGui::Checkbox( "Debug Render", &milton->debug_render );
+
             if ( milton->current_mode == MiltonMode::PEN ||
                  mode_is_for_primitives(milton->current_mode) ) {
                 const float pen_alpha = milton_get_brush_alpha(milton);
@@ -377,6 +380,12 @@ gui_brush_window(MiltonInput* input, PlatformState* platform, Milton* milton, Pl
                 if ( ImGui::Button(loc(TXT_switch_to_eraser)) ) {
                     input->mode_to_set = MiltonMode::ERASER;
                 }
+            }
+
+            if ( milton->current_mode == MiltonMode::PEN )
+            {
+                ImGui::SliderFloat("Merge Dist", &milton->merge_dist, 0.0f, 100.0f);
+                ImGui::SliderFloat("Merge Angle", &milton->merge_angle, 0.0f, 1.0f);
             }
 
             if (milton->current_mode == MiltonMode::PRIMITIVE_GRID ) {

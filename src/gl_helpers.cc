@@ -150,6 +150,9 @@ compile_shader (const char* in_src, GLuint type, char* config, char* variation_c
 
     GLuint obj = glCreateShader(type);
 
+    GLsizei firstline_len = 0;
+    while( in_src[firstline_len++] != '\n' );
+    glObjectLabel(GL_SHADER, obj, firstline_len, in_src );
     glShaderSource(obj, array_count(sources), sources, NULL);
     glCompileShader(obj);
     // ERROR CHECKING

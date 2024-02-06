@@ -356,6 +356,41 @@ stroke_append_point(Stroke* stroke, v2l canvas_point, f32 pressure)
     }
 }
 
+void
+stroke_append_point_smooth(Stroke* stroke, v2l canvas_point, f32 pressure, f32 merge_dist, f32 merge_angle)
+{
+    if ( stroke->num_points >= 2 ) {
+        v2f a = v2l_to_v2f(canvas_point);
+        v2f c = v2l_to_v2f(stroke->points[stroke->num_points-2]);
+
+        v2f distance = c - a;
+        f32 distsqr = fabsf( distance.x*distance.x + distance.y*distance.y);
+    
+        if (distsqr < (merge_dist*merge_dist))
+        {
+            v2f b = v2l_to_v2f(stroke->points[stroke->num_points-1]);
+            v2f atob = b - a;
+            v2f btoc = c - b;
+            f32 r0 = fabsf(atan2f( atob.x, atob.y ));
+            f32 r1 = fabsf(atan2f( btoc.x, btoc.y ));
+            f32 rdif = fabsf(r1 - r0);
+            if (rdif < merge_angle) {
+                // TODO: interpolate
+                stroke->points[stroke->num_points-1] = canvas_point;
+                return;
+            }
+        }
+    }
+
+    // A point passes inspection if:
+    // Add to current stroke.
+    if ( stroke->num_points < STROKE_MAX_POINTS ) {
+        int index = stroke->num_points++;
+        stroke->points[index] = canvas_point;
+        stroke->pressures[index] = pressure;
+    }
+}
+
 static v2l
 smooth_filter(SmoothFilter* filter, v2l input)
 {
@@ -466,7 +501,8 @@ milton_stroke_input(Milton* milton, MiltonInput const* input)
             pressure = 1.0f;
         }
 
-        stroke_append_point(ws, canvas_point, pressure);
+        f32 scale = (f32)milton->view->scale;
+        stroke_append_point_smooth(ws, canvas_point, pressure, milton->merge_dist * scale, milton->merge_angle);
     }
 }
 
@@ -1559,6 +1595,12 @@ milton_update_and_render(Milton* milton, MiltonInput const* input)
         render_flags |= RenderBackendFlags_GUI_VISIBLE;
     } else {
         render_flags &= ~RenderBackendFlags_GUI_VISIBLE;
+    }
+
+    if ( milton->debug_render ) {
+        render_flags |= RenderBackendFlags_DEBUG;
+    } else {
+        render_flags &= ~RenderBackendFlags_DEBUG;
     }
 
     // Mode tick
